@@ -49,10 +49,14 @@ const stepIndex = document.querySelector("#stepIndex");
 const backBtn = document.querySelector("#backBtn");
 const nextBtn = document.querySelector("#nextBtn");
 const buildBtn = document.querySelector("#buildBtn");
+const aiBtn = document.querySelector("#aiBtn");
 const pdfBtn = document.querySelector("#pdfBtn");
 const saveBtn = document.querySelector("#saveBtn");
 const mapOutput = document.querySelector("#mapOutput");
 const crisisNotice = document.querySelector("#crisisNotice");
+const aiReflectionPanel = document.querySelector("#aiReflectionPanel");
+const aiReflectionState = document.querySelector("#aiReflectionState");
+const aiReflectionOutput = document.querySelector("#aiReflectionOutput");
 const savedList = document.querySelector("#savedList");
 
 function setupChoices() {
@@ -106,6 +110,7 @@ function bindEvents() {
   backBtn.addEventListener("click", () => goToStep(Math.max(0, state.step - 1)));
   nextBtn.addEventListener("click", handleNext);
   buildBtn.addEventListener("click", buildMap);
+  aiBtn.addEventListener("click", requestAIReflection);
   pdfBtn.addEventListener("click", downloadPdf);
   saveBtn.addEventListener("click", saveAwareness);
   form.addEventListener("input", () => {
@@ -162,6 +167,7 @@ function goToStep(step) {
   nextBtn.textContent = step === steps.length - 1 ? "\uCC98\uC74C\uC73C\uB85C" : "\uB2E4\uC74C";
   saveBtn.classList.toggle("hidden", step !== 7);
   buildBtn.classList.toggle("hidden", step < 6);
+  aiBtn.classList.toggle("hidden", step !== 6);
   pdfBtn.classList.toggle("hidden", step !== 6);
 
   if (step === 6) buildMap();
@@ -208,6 +214,8 @@ function buildMap() {
       \uC548\uC804\uC744 \uBA3C\uC800 \uD655\uBCF4\uD558\uB294 \uAC83\uC774 \uC911\uC694\uD569\uB2C8\uB2E4.
     `;
     mapOutput.innerHTML = "";
+    aiReflectionPanel.classList.add("hidden");
+    aiReflectionOutput.innerHTML = "";
     return;
   }
 
@@ -215,7 +223,50 @@ function buildMap() {
   crisisNotice.innerHTML = "";
 
   const map = createMindMap(data);
+  state.latestMindMap = map;
   mapOutput.innerHTML = renderMap(map);
+}
+
+async function requestAIReflection() {
+  buildMap();
+
+  if (!state.latestMindMap || !crisisNotice.classList.contains("hidden")) {
+    return;
+  }
+
+  aiReflectionPanel.classList.remove("hidden");
+  aiReflectionState.textContent = "\uBC18\uC870 \uC911...";
+  aiReflectionOutput.innerHTML = `<p>\uC785\uB825\uD55C \uAD00\uACC4\uB9DD\uC744 \uD568\uAED8 \uBE44\uCD94\uACE0 \uC788\uC2B5\uB2C8\uB2E4.</p>`;
+  aiBtn.disabled = true;
+
+  try {
+    const response = await fetch("/api/indra-map", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        form: formData(),
+        emotions: [...state.emotions.entries()].map(([emotion, intensity]) => ({ emotion, intensity })),
+        self_images: [
+          ...state.selfImages,
+          ...(form.elements.custom_self_image.value.trim() ? [form.elements.custom_self_image.value.trim()] : []),
+        ],
+        local_map: state.latestMindMap,
+      }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.error || "\uBC18\uC870\uB97C \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+    }
+
+    aiReflectionState.textContent = "\uC644\uB8CC";
+    aiReflectionOutput.innerHTML = renderAIReflection(payload.reflection);
+  } catch (error) {
+    aiReflectionState.textContent = "\uD655\uC778 \uD544\uC694";
+    aiReflectionOutput.innerHTML = `<p>${escapeHtml(error.message)}<br>Vercel \uD658\uACBD\uBCC0\uC218\uC5D0 OPENAI_API_KEY\uAC00 \uC124\uC815\uB418\uC5C8\uB294\uC9C0 \uD655\uC778\uD574 \uC8FC\uC138\uC694.</p>`;
+  } finally {
+    aiBtn.disabled = false;
+  }
 }
 
 function downloadPdf() {
@@ -344,6 +395,32 @@ function renderMap(map) {
     ${card("\uC228\uC740 \uC695\uAD6C", listMarkup(map.hidden_needs), "", true)}
     ${card("\uAD00\uCC30\uC790 \uBB38\uC7A5", map.observer_reframe, "wide")}
     ${card("\uC624\uB298\uC758 \uC218\uD589\uBB38", listMarkup(map.awareness_sentences), "wide", true)}
+  `;
+}
+
+function renderAIReflection(reflection) {
+  if (!reflection) {
+    return `<p>\uBC18\uC870 \uACB0\uACFC\uAC00 \uBE44\uC5B4 \uC788\uC2B5\uB2C8\uB2E4.</p>`;
+  }
+
+  return `
+    ${reflectionCard("\uC624\uB298\uC758 \uC778\uB4DC\uB77C\uB9DD \uC694\uC57D", reflection.indra_map_summary)}
+    ${reflectionCard("\uC11C\uB85C \uBE44\uCD94\uB294 \uD575\uC2EC \uAD00\uACC4", listMarkup(reflection.key_relationships || []), true)}
+    ${reflectionCard("\uBD99\uC7A1\uACE0 \uC788\uB358 \uC0C1\uC758 \uBC18\uC870", listMarkup(reflection.self_image_reflections || []), true)}
+    ${reflectionCard("\uC228\uC740 \uC695\uAD6C", listMarkup(reflection.hidden_needs || []), true)}
+    ${reflectionCard("\uAD00\uCC30\uC790 \uBB38\uC7A5", reflection.observer_reframe)}
+    ${reflectionCard("\uC624\uB298\uC758 \uC54C\uC544\uCC28\uB9BC \uBB38\uC7A5", listMarkup(reflection.awareness_sentences || []), true)}
+    ${reflectionCard("\uB354 \uBCFC \uC9C8\uBB38", listMarkup(reflection.next_questions || []), true)}
+    ${reflection.safety_note ? reflectionCard("\uC548\uC804 \uC548\uB0B4", reflection.safety_note) : ""}
+  `;
+}
+
+function reflectionCard(title, body, isHtml = false) {
+  return `
+    <article class="reflection-card">
+      <h4>${title}</h4>
+      ${isHtml ? body : `<p>${escapeHtml(body || "")}</p>`}
+    </article>
   `;
 }
 

@@ -316,6 +316,59 @@ textarea:focus {
   padding-left: 20px;
 }
 
+.ai-reflection {
+  margin-top: 24px;
+  padding: 22px;
+  border: 1px solid rgba(66, 110, 145, 0.25);
+  border-radius: 8px;
+  background: #f7fbfc;
+}
+
+.ai-reflection-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.ai-reflection-head h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+#aiReflectionState {
+  color: var(--blue);
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ai-reflection-output {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.reflection-card {
+  padding: 16px;
+  border: 1px solid #d5e2e6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.reflection-card h4 {
+  margin: 0 0 10px;
+  color: var(--blue);
+  font-size: 0.96rem;
+}
+
+.reflection-card p,
+.reflection-card li {
+  margin-top: 0;
+  color: #344044;
+  line-height: 1.75;
+}
+
 .bead-row {
   display: flex;
   flex-wrap: wrap;
@@ -440,6 +493,15 @@ textarea:focus {
 
   .map-output {
     grid-template-columns: 1fr;
+  }
+
+  .ai-reflection-head,
+  .ai-reflection-output {
+    display: block;
+  }
+
+  .reflection-card {
+    margin-top: 10px;
   }
 
   .actions {
